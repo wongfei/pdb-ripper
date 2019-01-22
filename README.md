@@ -8,17 +8,17 @@ Extracts UserDefinedTypes from pdb file and generates cpp code
 Dia2Dump.exe -rip [flags] ... <input.pdb>
 -s		: include symbol hierarchy
 -m		: generate UDT with meta information
--cpp	: generate cpp code
+-cpp		: generate cpp code
 -d		: include class deps
 -rd		: resolve/sort class deps
--names	: select specific UDTs (-names "nameA;nameB;-excludeC")
+-names		: select specific UDTs (-names "nameA;nameB;-excludeC")
 ```
 
 ## How it works
 
 Imagine some code compiled into test.exe / test.pdb
 
-```
+```cpp
 class Shape {
 public:
    Shape(int newx, int newy);
@@ -34,6 +34,7 @@ private:
    int x;
    int y;
 };
+
 Shape::Shape(int newx, int newy) { moveTo(newx, newy); }
 Shape::~Shape() {}
 int Shape::getX() { return x; }
@@ -43,9 +44,7 @@ void Shape::setY(int newy) { y = newy; }
 void Shape::moveTo(int newx, int newy) { setX(newx); setY(newy); }
 void Shape::rMoveTo(int deltax, int deltay) { moveTo(getX() + deltax, getY() + deltay); }
 void Shape::draw() {}
-```
 
-```
 class Rectangle: public Shape {
 public:
    Rectangle(int newx, int newy, int newwidth, int newheight);
@@ -58,15 +57,14 @@ private:
    int width;
    int height;
 };
+
 Rectangle::Rectangle(int newx, int newy, int newwidth, int newheight): Shape(newx, newy) { setWidth(newwidth); setHeight(newheight); }
 int Rectangle::getWidth() { return width; }
 int Rectangle::getHeight() { return height; }
 void Rectangle::setWidth(int newwidth) { width = newwidth; }
 void Rectangle::setHeight(int newheight) { height = newheight; }
 void Rectangle::draw() { printf("Rectangle %d %d %d %d\n", getX(), getY(), getWidth(), getHeight()); }
-```
 
-```
 class Circle: public Shape {
 public:
    Circle(int newx, int newy, int newradius);
@@ -83,10 +81,12 @@ void Circle::draw() { printf("Circle %d %d %d\n", getX(), getY(), getRadius()); 
 ```
 
 Invite the ripper to do some work:
+
 `Dia2Dump.exe -rip -s -m -cpp -d -rd -names "Rectangle;Circle" test.pdb > gen.h`
 
 Generated file:
-```
+
+```cpp
 //UDT: class Shape @len=16 @vfcount=2
 	//_VTable: 
 	//_Func: public void Shape(Shape &  _arg0); @loc=optimized @len=0 @rva=0
