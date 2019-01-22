@@ -1,0 +1,13 @@
+_bin/
+_obj/
+
+.vs/
+
+*.sln
+*.suo
+*.sdf
+*.opensdf
+*.db
+*.opendb
+*.exe
+*.pdb
