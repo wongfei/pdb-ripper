@@ -74,6 +74,7 @@ public:
 private:
    int radius;
 };
+
 Circle::Circle(int newx, int newy, int newradius): Shape(newx, newy) { setRadius(newradius); }
 int Circle::getRadius() { return radius; }
 void Circle::setRadius(int newradius) { radius = newradius; }
@@ -191,7 +192,7 @@ public:
 
 Inject dll into test.exe and do some manipulations:
 
-```
+```cpp
 template<typename T, typename ...Args>
 static inline T* new_udt(Args&&... params) {
 	T* obj = (T*)malloc(sizeof(T));
