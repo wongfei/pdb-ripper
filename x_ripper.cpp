@@ -120,7 +120,7 @@ static void PrintCppForwardDecl(IDiaSymbol *global, ResolvedUdtGraphPtr resolved
 						wprintf(L"%s %s;\n", rgUdtKind[kind], fixName(name).c_str());
 					}
 					else {
-						wprintf(L"struct %s; //???\n", fixName(name).c_str());
+						//wprintf(L"//\"%s\"; ???\n", name.c_str());
 					}
 					++count;
 				}
