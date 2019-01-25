@@ -516,24 +516,26 @@ void RipPdb(IDiaSymbol *pGlobal, int argc, wchar_t *argv[])
 	// ARGS:
 	// app.exe -rip [flags] ... <input.pdb>
 
+	BOOL bDumpNamesOnly = FALSE;
+	BOOL bIncludeInternals = FALSE;
+	BOOL bIncludeTemplates = FALSE;
 	BOOL bSymbols = FALSE;
 	BOOL bMeta = FALSE;
 	BOOL bCpp = FALSE;
 	BOOL bGuardObjects = FALSE;
-	BOOL bIncludeTemplates = FALSE;
 	BOOL bExpandDeps = FALSE;
 	BOOL bResolveDeps = FALSE;
 	std::wstring filter;
 
-	if (argc > 3) // got flags
-	{
-		for (int i = 2; i < argc - 1; ++i)
-		{
-			if (!wcscmp(argv[i], L"-s")) bSymbols = TRUE;
+	if (argc > 3) {
+		for (int i = 2; i < argc - 1; ++i) {
+			if (!wcscmp(argv[i], L"-dno")) bDumpNamesOnly = TRUE;
+			else if (!wcscmp(argv[i], L"-ii")) bIncludeInternals = TRUE;
+			else if (!wcscmp(argv[i], L"-it")) bIncludeTemplates = TRUE;
+			else if (!wcscmp(argv[i], L"-s")) bSymbols = TRUE;
 			else if (!wcscmp(argv[i], L"-m")) bMeta = TRUE;
 			else if (!wcscmp(argv[i], L"-cpp")) bCpp = TRUE;
 			else if (!wcscmp(argv[i], L"-g")) bGuardObjects = TRUE;
-			else if (!wcscmp(argv[i], L"-t")) bIncludeTemplates = TRUE;
 			else if (!wcscmp(argv[i], L"-d")) bExpandDeps = TRUE;
 			else if (!wcscmp(argv[i], L"-rd")) bResolveDeps = TRUE;
 			else if (!wcscmp(argv[i], L"-names") && (i + 1 < argc - 1)) { filter = argv[i + 1]; i++; }
@@ -541,41 +543,45 @@ void RipPdb(IDiaSymbol *pGlobal, int argc, wchar_t *argv[])
 	}
 
 	auto graph = GetUdtGraph(pGlobal);
-	auto filtered = FilterUdtGraph(graph, filter, bExpandDeps);
+
+	UdtGraphPtr filtered;
+	if (filter.empty()) {
+		filtered = graph;
+	}
+	else {
+		filtered = FilterUdtGraph(graph, filter, bExpandDeps);
+	}
 
 	ResolvedUdtGraphPtr resolved;
-	if (bResolveDeps)
-	{
+	if (bResolveDeps) {
 		resolved = ResolveDeps(filtered);
 	}
-	else
-	{
+	else {
 		resolved = SortBySymId(filtered);
 	}
 
-	if (bCpp)
-	{
+	if (bCpp) {
 		wprintf(L"// ### AUTO-GENERATED ###\n\n");
 		PrintCppEnums(pGlobal, resolved);
 		PrintCppForwardDecl(pGlobal, resolved, graph);
 	}
 
-	for (auto& node : resolved->nodes)
-	{
-		if (IsAllowedName(node->name.c_str()) && (bIncludeTemplates || !IsTemplateClass(node->name.c_str())))
-		{
-			if (bSymbols)
-			{
-				std::unordered_set<DWORD> uniq;
-				PrintMetaSym(*node->symbol, uniq);
+	for (auto& node : resolved->nodes) {
+		if ((bIncludeInternals || IsAllowedName(node->name.c_str())) && (bIncludeTemplates || !IsTemplateClass(node->name.c_str()))) {
+			if (bDumpNamesOnly) {
+				wprintf(L"%s\n", node->name.c_str());
 			}
-			if (bMeta)
-			{
-				PrintMetaUDT(*node->symbol);
-			}
-			if (bCpp)
-			{
-				PrintCppUDT(*node->symbol, bGuardObjects);
+			else {
+				if (bSymbols) {
+					std::unordered_set<DWORD> uniq;
+					PrintMetaSym(*node->symbol, uniq);
+				}
+				if (bMeta) {
+					PrintMetaUDT(*node->symbol);
+				}
+				if (bCpp) {
+					PrintCppUDT(*node->symbol, bGuardObjects);
+				}
 			}
 		}
 	}

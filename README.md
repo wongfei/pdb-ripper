@@ -6,8 +6,11 @@ Extracts UserDefinedTypes from pdb file and generates cpp code
 
 ```
 Dia2Dump.exe -rip [flags] ... <input.pdb>
--s		: include symbol hierarchy
--m		: generate UDT with meta information
+-dno		: dump names only
+-ii		: include internals
+-it		: include templates
+-s		: generate symbol information
+-m		: generate meta information
 -cpp		: generate cpp code
 -d		: include class deps
 -rd		: resolve/sort class deps
