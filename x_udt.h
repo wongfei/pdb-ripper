@@ -462,6 +462,8 @@ static bool Depends(const UdtNodePtr& a, const UdtNodePtr& b)
 		deps.push_back(idep.second);
 	}
 
+	std::unordered_set<DWORD> processed;
+
 	for (;;) {
 		if (deps.empty()) break;
 
@@ -470,8 +472,12 @@ static bool Depends(const UdtNodePtr& a, const UdtNodePtr& b)
 
 		if (dep->dep_s.find(b->name) != dep->dep_s.end()) return true;
 
+		processed.insert(dep->id);
+
 		for (auto& idep : dep->dep_n) {
-			deps.push_back(idep.second);
+			if (processed.find(idep.second->id) == processed.end()) {
+				deps.push_back(idep.second);
+			}
 		}
 	}
 
@@ -501,8 +507,7 @@ static ResolvedUdtGraphPtr ResolveDeps(UdtGraphPtr input)
 	}
 
 	std::list<UdtNodePtr> resolved;
-	for (;;) {
-		if (nodes.empty()) break;
+	while (!nodes.empty()) {
 
 		resolved.clear();
 		for (auto& node : nodes) {
@@ -521,6 +526,19 @@ static ResolvedUdtGraphPtr ResolveDeps(UdtGraphPtr input)
 			if (!haveDeps) {
 				resolved.push_back(node);
 			}
+		}
+
+		if (resolved.empty()) {
+			UdtNodePtr bestNode;
+			int minDeps = INT_MAX;
+			for (auto& node : nodes) {
+				if (minDeps > node->dep_s.size()) {
+					minDeps = node->dep_s.size();
+					bestNode = node;
+				}
+			}
+			result->nodes.push_back(bestNode);
+			nodes.remove(bestNode);
 		}
 
 		for (auto& node : resolved) {
