@@ -6,14 +6,15 @@ Extracts UserDefinedTypes from pdb file and generates cpp code
 
 ```
 Dia2Dump.exe -rip [flags] ... <input.pdb>
--dno		: dump names only
+-printNamesOnly
+-printCppProxy
+-genCppFiles
 -ii		: include internals
 -it		: include templates
 -s		: generate symbol information
 -m		: generate meta information
--cpp		: generate cpp code
--d		: include class deps
--rd		: resolve/sort class deps
+-d		: include deps
+-rd		: resolve/sort deps
 -names		: select specific UDTs (-names "nameA;nameB;-excludeC")
 ```
 
@@ -86,7 +87,7 @@ void Circle::draw() { printf("Circle %d %d %d\n", getX(), getY(), getRadius()); 
 
 Invite the ripper to do some work:
 
-`Dia2Dump.exe -rip -s -m -cpp -d -rd -names "Rectangle;Circle" test.pdb > gen.h`
+`Dia2Dump.exe -rip -printCppProxy -s -m -d -rd -names "Rectangle;Circle" test.pdb > gen.h`
 
 Generated file:
 
@@ -193,7 +194,7 @@ public:
 };
 ```
 
-Inject dll into test.exe and do some manipulations:
+Inject into test.exe and do some manipulations:
 
 ```cpp
 template<typename T, typename ...Args>

@@ -91,6 +91,8 @@
   <ItemGroup>
     <ClInclude Include="callback.h" />
     <ClInclude Include="dia2dump.h" />
+    <ClInclude Include="x_cpp_gen_file.h" />
+    <ClInclude Include="x_cpp_enum.h" />
     <ClInclude Include="x_meta.h" />
     <ClInclude Include="PrintSymbol.h" />
     <ClInclude Include="regs.h" />
@@ -98,6 +100,7 @@
     <ClInclude Include="x_names.h" />
     <ClInclude Include="x_common.h" />
     <ClInclude Include="x_print.h" />
+    <ClInclude Include="x_cpp_proxy.h" />
     <ClInclude Include="x_str.h" />
     <ClInclude Include="x_udt.h" />
   </ItemGroup>

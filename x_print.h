@@ -18,6 +18,45 @@ static void wprintfX(std::wstring* dst, const wchar_t* format, ...)
 	}
 }
 
+static void PrintVariantX(VARIANT var, std::wstring* dst = nullptr)
+{
+	switch (var.vt) {
+		case VT_UI1:
+		case VT_I1:
+			wprintfX(dst, L" 0x%X", var.bVal);
+			break;
+
+		case VT_I2:
+		case VT_UI2:
+		case VT_BOOL:
+			wprintfX(dst, L" 0x%X", var.iVal);
+			break;
+
+		case VT_I4:
+		case VT_UI4:
+		case VT_INT:
+		case VT_UINT:
+		case VT_ERROR:
+			wprintfX(dst, L" 0x%X", var.lVal);
+			break;
+
+		case VT_R4:
+			wprintfX(dst, L" %g", var.fltVal);
+			break;
+
+		case VT_R8:
+			wprintfX(dst, L" %g", var.dblVal);
+			break;
+
+		case VT_BSTR:
+			wprintfX(dst, L" \"%s\"", var.bstrVal);
+			break;
+
+		default:
+			wprintfX(dst, L" ??");
+	}
+}
+
 static void PrintNameX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 {
 	BSTR bstrName;
@@ -96,45 +135,6 @@ static void PrintBaseTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 
 	if (dwInfo != 0xFFFFFFFF) {
 		wprintfX(dst, L"%s", rgBaseType[dwInfo]);
-	}
-}
-
-static void PrintVariantX(VARIANT var, std::wstring* dst = nullptr)
-{
-	switch (var.vt) {
-		case VT_UI1:
-		case VT_I1:
-			wprintfX(dst, L" 0x%X", var.bVal);
-			break;
-
-		case VT_I2:
-		case VT_UI2:
-		case VT_BOOL:
-			wprintfX(dst, L" 0x%X", var.iVal);
-			break;
-
-		case VT_I4:
-		case VT_UI4:
-		case VT_INT:
-		case VT_UINT:
-		case VT_ERROR:
-			wprintfX(dst, L" 0x%X", var.lVal);
-			break;
-
-		case VT_R4:
-			wprintfX(dst, L" %g", var.fltVal);
-			break;
-
-		case VT_R8:
-			wprintfX(dst, L" %g", var.dblVal);
-			break;
-
-		case VT_BSTR:
-			wprintfX(dst, L" \"%s\"", var.bstrVal);
-			break;
-
-		default:
-			wprintfX(dst, L" ??");
 	}
 }
 
@@ -354,14 +354,14 @@ static void PrintArraySizeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 		ULONGLONG ulLenElem = 0;
 
 		if (pSymbol->get_count(&dwCountElems) == S_OK) {
-			wprintfX(dst, L"[0x%X]", dwCountElems);
+			wprintfX(dst, L"[%u]", (unsigned int)dwCountElems);
 		}
 		else if ((pSymbol->get_length(&ulLenArray) == S_OK) && (baseType->get_length(&ulLenElem) == S_OK)) {
 			if (ulLenElem == 0) {
-				wprintfX(dst, L"[0x%lX]", (ULONG)ulLenArray);
+				wprintfX(dst, L"[%u]", (unsigned int)ulLenArray);
 			}
 			else {
-				wprintfX(dst, L"[0x%lX]", (ULONG)ulLenArray / (ULONG)ulLenElem);
+				wprintfX(dst, L"[%u]", (unsigned int)ulLenArray / (unsigned int)ulLenElem);
 			}
 		}
 	}
@@ -409,7 +409,7 @@ static void PrintCustomTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 }
 
 enum class EPrintFuncArgs {
-	
+
 };
 
 static void PrintFunctionArgsX(IDiaSymbol *pFunc, BOOL genArgTypes = TRUE, BOOL genArgNames = FALSE, const wchar_t* pthisType = nullptr, std::wstring* dst = nullptr)
@@ -418,14 +418,14 @@ static void PrintFunctionArgsX(IDiaSymbol *pFunc, BOOL genArgTypes = TRUE, BOOL 
 
 	int argId = 0;
 
-	if (pthisType) { 
+	if (pthisType) {
 		if (genArgTypes) {
 			wprintfX(dst, L"%s *pthis", pthisType);
 		}
 		else {
 			wprintfX(dst, L"this");
 		}
-		argId++; 
+		argId++;
 	}
 
 	int dataCount = 0;

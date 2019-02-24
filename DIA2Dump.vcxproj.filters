@@ -51,6 +51,15 @@
     <ClInclude Include="x_str.h">
       <Filter>_custom</Filter>
     </ClInclude>
+    <ClInclude Include="x_cpp_proxy.h">
+      <Filter>_custom</Filter>
+    </ClInclude>
+    <ClInclude Include="x_cpp_enum.h">
+      <Filter>_custom</Filter>
+    </ClInclude>
+    <ClInclude Include="x_cpp_gen_file.h">
+      <Filter>_custom</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dia2dump.cpp">

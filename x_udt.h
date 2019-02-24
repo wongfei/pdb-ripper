@@ -533,7 +533,7 @@ static ResolvedUdtGraphPtr ResolveDeps(UdtGraphPtr input)
 			int minDeps = INT_MAX;
 			for (auto& node : nodes) {
 				if (minDeps > node->dep_s.size()) {
-					minDeps = node->dep_s.size();
+					minDeps = (int)node->dep_s.size();
 					bestNode = node;
 				}
 			}
