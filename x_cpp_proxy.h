@@ -142,7 +142,7 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 	// dummy constructor
 	#if defined(GEN_DUMMY_CTOR)
 	{
-		wprintf(L"\tinline %s() ", nameFixed.c_str());
+		wprintf(L"\tinline %s()", nameFixed.c_str());
 		int count = 0;
 		SymbolEnumerator symbol;
 		if (symbol.Find(pUDT, SymTagData, NULL)) {
@@ -180,8 +180,11 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 					}
 				}
 			}
-			wprintf(L" { }\n");
 		}
+		wprintf(L" { }\n");
+		const wchar_t* type = nameFixed.c_str();
+		wprintf(L"\tinline %s(const %s& other) = default;\n", type, type);
+		wprintf(L"\tinline %s& operator=(const %s& other) = default;\n", type, type);
 	}
 	#endif
 
@@ -197,6 +200,7 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				Bstr funcName;
 				symbol->get_name(&funcName);
 				if (wcsstr(*funcName, L"__vecDelDtor")) continue;
+				if (wcsstr(*funcName, L"operator=")) continue;
 
 				BOOL isPure = FALSE;
 				symbol->get_pure(&isPure);
