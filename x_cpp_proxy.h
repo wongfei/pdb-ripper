@@ -208,7 +208,8 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				BOOL isVirtual = FALSE;
 				symbol->get_virtual(&isVirtual);
 
-				if (isPure && !isVirtual) continue;
+				BOOL isStatic = FALSE;
+				symbol->get_isStatic(&isStatic);
 
 				ULONGLONG len = 0;
 				DWORD dwLocType = 0, dwRVA = 0, dwSect = 0, dwOff = 0;
@@ -217,9 +218,11 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				symbol->get_relativeVirtualAddress(&dwRVA);
 				symbol->get_addressSection(&dwSect);
 				symbol->get_addressOffset(&dwOff);
-
 				BOOL isOptimized = (dwLocType == 0);
+
+				//if (isPure && !isVirtual) continue;
 				if (isOptimized && !isVirtual) continue;
+				//if (isOptimized) continue;
 
 				DWORD vtpo = 0; // virtual table pointer offset
 				DWORD vfid = 0; // virtual function id in VT
@@ -294,9 +297,15 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				}
 
 				// inline rva calls
-				if (!isOptimized && !isPure) {
+				//if (!isOptimized && !isPure) {
+				if (!isOptimized) {
 
 					wprintf(L"\tinline ");
+
+					if (isStatic) {
+						wprintf(L"static ");
+					}
+
 					if (isDtor) {
 						wprintf(L"void dtor");
 					}
@@ -329,7 +338,12 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 						wprintf(L"%s ", rgCallConv[callConv]);
 					}
 					wprintf(L"*_fpt)(");
-					PrintFunctionArgsX(*symbol, TRUE, FALSE, nameFixed.c_str());
+					if (isStatic) {
+						PrintFunctionArgsX(*symbol, TRUE, FALSE);
+					}
+					else {
+						PrintFunctionArgsX(*symbol, TRUE, FALSE, nameFixed.c_str());
+					}
 					wprintf(L");");
 					//wprintf(L" _fpt _fp=(_fpt)(((uint8_t*)_g_module)+%u);", (unsigned int)dwRVA);
 					wprintf(L" _fpt _f=(_fpt)_drva(%u);", (unsigned int)dwRVA);
@@ -343,7 +357,12 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 						else {
 							wprintf(L" return _f(");
 						}
-						PrintFunctionArgsX(*symbol, FALSE, TRUE, nameFixed.c_str());
+						if (isStatic) {
+							PrintFunctionArgsX(*symbol, FALSE, TRUE);
+						}
+						else {
+							PrintFunctionArgsX(*symbol, FALSE, TRUE, nameFixed.c_str());
+						}
 						wprintf(L");");
 					}
 					wprintf(L" }");
