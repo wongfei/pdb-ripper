@@ -68,6 +68,8 @@ void RipPdb(IDiaSymbol *pGlobal, int argc, wchar_t *argv[])
 		}
 	}
 
+	//MessageBoxA(NULL, "_debug", "_debug", MB_OK);
+
 	auto graph = GetUdtGraph(pGlobal);
 
 	UdtGraphPtr filtered;

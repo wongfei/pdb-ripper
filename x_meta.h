@@ -15,7 +15,7 @@ static std::wstring GetUniqFunctionName(IDiaSymbol *pFunc)
 	return result;
 }
 
-static IDiaSymbol* FindIntroVirtual(const std::wstring& funcName, IDiaSymbol* pObj, DWORD* pBaseOffset)
+static IDiaSymbol* FindIntroVirtual(IDiaSymbol* pObj, const std::wstring& funcName, DWORD* pBaseOffset)
 {
 	ComRef<IDiaEnumSymbols> enumerator;
 	ComRef<IDiaSymbol> sym;
@@ -51,7 +51,7 @@ static IDiaSymbol* FindIntroVirtual(const std::wstring& funcName, IDiaSymbol* pO
 		ULONG celt = 0;
 		while (SUCCEEDED(enumerator->Next(1, &sym, &celt)) && (celt == 1))
 		{
-			IDiaSymbol* res = FindIntroVirtual(funcName, *sym, pBaseOffset);
+			IDiaSymbol* res = FindIntroVirtual(*sym, funcName, pBaseOffset);
 			if (res)
 			{
 				LONG offset;
@@ -85,9 +85,26 @@ static void GetVirtualFuncInfo(IDiaSymbol* pThis, IDiaSymbol* pFunc, DWORD& vtpo
 
 		if (off == 0 && !isIntro)
 		{
+			Bstr udtName;
+			pThis->get_name(&udtName);
+
+			std::wstring udtPrefix(*udtName);
+			udtPrefix.append(L"::");
+
+			Bstr symName;
+			pFunc->get_name(&symName);
+
 			auto funcName = GetUniqFunctionName(pFunc);
 
-			ComRef<IDiaSymbol> intro(FindIntroVirtual(funcName, pThis, &vtpo));
+			// HACK: on win10 have to remove UDT name prefix
+			auto prefixPos = funcName.find_first_of(udtPrefix);
+			if ((prefixPos != std::wstring::npos) && (prefixPos + udtPrefix.length() < funcName.length()))
+			{
+				std::wstring funcNameNoPrefix(funcName.substr(prefixPos + udtPrefix.length()));
+				funcName = funcNameNoPrefix;
+			}
+
+			ComRef<IDiaSymbol> intro(FindIntroVirtual(pThis, funcName, &vtpo));
 			if (*intro)
 			{
 				intro->get_virtualBaseOffset(&off);
