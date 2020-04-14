@@ -232,8 +232,14 @@ static void PrintPointerTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	BOOL isRef = FALSE;
 	pSymbol->get_reference(&isRef);
 
+	BOOL isConst = FALSE;
+	pSymbol->get_constType(&isConst);
+
 	DWORD baseTypeTag = 0;
 	pBaseType->get_symTag(&baseTypeTag);
+
+	BOOL isBaseConst = FALSE;
+	pBaseType->get_constType(&isBaseConst);
 
 	#if 0
 	if (baseTypeTag == SymTagUDT && !isRef)
@@ -243,6 +249,10 @@ static void PrintPointerTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 		wprintfX(dst, L"%s ", rgUdtKind[kind]);
 	}
 	#endif
+
+	if (isBaseConst) {
+		wprintfX(dst, L"const ");
+	}
 
 	if (baseTypeTag == SymTagFunctionType)
 	{
