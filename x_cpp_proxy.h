@@ -337,31 +337,47 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 					if (callConv > 0) {
 						wprintf(L"%s ", rgCallConv[callConv]);
 					}
+					if (!isStatic) {
+						wprintf(L"%s::", nameFixed.c_str());
+					}
 					wprintf(L"*_fpt)(");
 					if (isStatic) {
 						PrintFunctionArgsX(*symbol, TRUE, FALSE);
 					}
 					else {
-						PrintFunctionArgsX(*symbol, TRUE, FALSE, nameFixed.c_str());
+						//PrintFunctionArgsX(*symbol, TRUE, FALSE, nameFixed.c_str());
+						PrintFunctionArgsX(*symbol, TRUE, FALSE);
 					}
 					wprintf(L");");
-					//wprintf(L" _fpt _fp=(_fpt)(((uint8_t*)_g_module)+%u);", (unsigned int)dwRVA);
-					wprintf(L" _fpt _f=(_fpt)_drva(%u);", (unsigned int)dwRVA);
+					if (isStatic) {
+						wprintf(L" auto _f=(_fpt)_drva(%u);", (unsigned int)dwRVA);
+					}
+					else {
+						wprintf(L" auto _f=xcast<_fpt>(_drva(%u));", (unsigned int)dwRVA);
+					}
 					if (isDtor) {
-						wprintf(L" _f(this);");
+						//wprintf(L" _f(this);");
+						wprintf(L" (this->*_f)();");
 					}
 					else {
 						if (isCtor) {
-							wprintf(L" _f(");
+							//wprintf(L" _f(");
+							wprintf(L" (this->*_f)(");
 						}
 						else {
-							wprintf(L" return _f(");
+							if (isStatic) {
+								wprintf(L" return _f(");
+							}
+							else {
+								wprintf(L" return (this->*_f)(");
+							}
 						}
 						if (isStatic) {
 							PrintFunctionArgsX(*symbol, FALSE, TRUE);
 						}
 						else {
-							PrintFunctionArgsX(*symbol, FALSE, TRUE, nameFixed.c_str());
+							//PrintFunctionArgsX(*symbol, FALSE, TRUE, nameFixed.c_str());
+							PrintFunctionArgsX(*symbol, FALSE, TRUE);
 						}
 						wprintf(L");");
 					}
@@ -382,9 +398,25 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 					PrintFunctionArgsX(*symbol, TRUE, TRUE);
 					wprintf(L")");
 					wprintf(L" { ");
-					wprintf(L"return %s_vf%u(", *funcName, (unsigned int)vfid);
-					PrintFunctionArgsX(*symbol, FALSE, TRUE);
-					wprintf(L");");
+
+					#if 0
+						wprintf(L"return %s_vf%u(", *funcName, (unsigned int)vfid);
+						PrintFunctionArgsX(*symbol, FALSE, TRUE);
+						wprintf(L");");
+					#else
+						wprintf(L"typedef ");
+						PrintTypeX(*returnType);
+						wprintf(L" (");
+						wprintf(L"%s::", nameFixed.c_str());
+						wprintf(L"*_fpt)(");
+						PrintFunctionArgsX(*symbol, TRUE, FALSE);
+						wprintf(L");");
+						wprintf(L" auto _f=xcast<_fpt>(get_vfp(this, %u));", (unsigned int)vfid);
+						wprintf(L" return (this->*_f)(");
+						PrintFunctionArgsX(*symbol, FALSE, TRUE);
+						wprintf(L");");
+					#endif
+
 					wprintf(L" }\n");
 				}
 				#endif
