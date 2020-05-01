@@ -1,21 +1,24 @@
 #pragma once
 
-static std::wstring GetUniqFunctionName(IDiaSymbol *pFunc)
+static std::wstring GetUniqFunctionName(IDiaSymbol *pFunc, BOOL bWithArgs = TRUE)
 {
 	std::wstring result;
 
 	Bstr name;
 	pFunc->get_name(&name);
-
 	result.assign(*name);
-	result.append(L"(");
-	PrintFunctionArgsX(pFunc, TRUE, FALSE, nullptr, &result);
-	result.append(L")");
+
+	if (bWithArgs)
+	{
+		result.append(L"(");
+		PrintFunctionArgsX(pFunc, TRUE, FALSE, nullptr, &result);
+		result.append(L")");
+	}
 
 	return result;
 }
 
-static IDiaSymbol* FindIntroVirtual(IDiaSymbol* pObj, const std::wstring& funcName, DWORD* pBaseOffset)
+static IDiaSymbol* FindIntroVirtual(IDiaSymbol* pObj, const std::wstring& funcName, DWORD* pBaseOffset, BOOL bWithArgs = TRUE)
 {
 	ComRef<IDiaEnumSymbols> enumerator;
 	ComRef<IDiaSymbol> sym;
@@ -25,9 +28,10 @@ static IDiaSymbol* FindIntroVirtual(IDiaSymbol* pObj, const std::wstring& funcNa
 		ULONG celt = 0;
 		while (SUCCEEDED(enumerator->Next(1, &sym, &celt)) && (celt == 1))
 		{
-			auto name = GetUniqFunctionName(*sym);
+			auto name = GetUniqFunctionName(*sym, bWithArgs);
 
-			if ((wcscmp(funcName.c_str(), name.c_str()) == 0)
+			if (
+				(wcscmp(funcName.c_str(), name.c_str()) == 0)
 				|| ((funcName)[0] == L'~' && (name)[0] == L'~'))
 			{
 				BOOL isVirtual = FALSE;
@@ -51,7 +55,7 @@ static IDiaSymbol* FindIntroVirtual(IDiaSymbol* pObj, const std::wstring& funcNa
 		ULONG celt = 0;
 		while (SUCCEEDED(enumerator->Next(1, &sym, &celt)) && (celt == 1))
 		{
-			IDiaSymbol* res = FindIntroVirtual(*sym, funcName, pBaseOffset);
+			IDiaSymbol* res = FindIntroVirtual(*sym, funcName, pBaseOffset, bWithArgs);
 			if (res)
 			{
 				LONG offset;
@@ -67,8 +71,10 @@ static IDiaSymbol* FindIntroVirtual(IDiaSymbol* pObj, const std::wstring& funcNa
 	return NULL;
 }
 
-static void GetVirtualFuncInfo(IDiaSymbol* pThis, IDiaSymbol* pFunc, DWORD& vtpo, DWORD& vfid)
+static BOOL GetVirtualFuncInfo(IDiaSymbol* pThis, IDiaSymbol* pFunc, DWORD& vtpo, DWORD& vfid)
 {
+	BOOL res = FALSE;
+
 	vtpo = 0; // virtual table pointer offset
 	vfid = 0; // virtual function id in VT
 
@@ -78,7 +84,7 @@ static void GetVirtualFuncInfo(IDiaSymbol* pThis, IDiaSymbol* pFunc, DWORD& vtpo
 	if (isVirtual)
 	{
 		DWORD off = 0;
-		pFunc->get_virtualBaseOffset(&off);
+		res = (S_OK == pFunc->get_virtualBaseOffset(&off));
 
 		BOOL isIntro = FALSE;
 		pFunc->get_intro(&isIntro);
@@ -97,21 +103,31 @@ static void GetVirtualFuncInfo(IDiaSymbol* pThis, IDiaSymbol* pFunc, DWORD& vtpo
 			auto funcName = GetUniqFunctionName(pFunc);
 
 			// HACK: on win10 have to remove UDT name prefix
-			auto prefixPos = funcName.find_first_of(udtPrefix);
-			if ((prefixPos != std::wstring::npos) && (prefixPos + udtPrefix.length() < funcName.length()))
-			{
-				std::wstring funcNameNoPrefix(funcName.substr(prefixPos + udtPrefix.length()));
-				funcName = funcNameNoPrefix;
-			}
+			removePrefix(funcName, udtPrefix);
 
 			ComRef<IDiaSymbol> intro(FindIntroVirtual(pThis, funcName, &vtpo));
+			if (!(*intro))
+			{
+				// HACK: find by function by name without args
+				funcName = *symName;
+				removePrefix(funcName, udtPrefix);
+				intro = FindIntroVirtual(pThis, funcName, &vtpo, FALSE);
+			}
+
 			if (*intro)
 			{
-				intro->get_virtualBaseOffset(&off);
+				res = (S_OK == intro->get_virtualBaseOffset(&off));
+			}
+			else
+			{
+				res = FALSE;
 			}
 		}
+
 		vfid = off / sizeof(void*);
 	}
+
+	return res;
 }
 
 static void PrintMetaSym(IDiaSymbol *pSymbol, std::unordered_set<DWORD>& uniq, int depth = 0)

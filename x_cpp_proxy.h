@@ -224,10 +224,22 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				if (isOptimized && !isVirtual) continue;
 				//if (isOptimized) continue;
 
+				#if 0
+				if (wcsstr(*funcName, L"addMeshCollider"))
+				{
+					int asd=0;
+				}
+				#endif
+
+				BOOL isValidVirtual = FALSE;
 				DWORD vtpo = 0; // virtual table pointer offset
 				DWORD vfid = 0; // virtual function id in VT
+
 				if (isVirtual) {
-					GetVirtualFuncInfo(pUDT, *symbol, vtpo, vfid);
+					isValidVirtual = GetVirtualFuncInfo(pUDT, *symbol, vtpo, vfid);
+					if (!isValidVirtual) {
+						wprintf(L"\t#error INVALID VFID %s::%s\n", nameFixed.c_str(), *funcName);
+					}
 				}
 
 				DWORD callConv = 0;
