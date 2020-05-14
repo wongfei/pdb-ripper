@@ -15,13 +15,13 @@ class Bstr
 public:
 	BSTR _str;
 
-	inline Bstr() : _str(nullptr) {}
+	inline Bstr() : _str(NULL) {}
 	inline Bstr(BSTR str) : _str(str) {}
 	
 	inline BSTR* operator &() { Release(); return &_str; }
 	inline BSTR operator *() { return _str; }
 
-	inline void Release() { if (_str) { SysFreeString(_str); _str = nullptr; } }
+	inline void Release() { if (_str) { SysFreeString(_str); _str = NULL; } }
 	inline ~Bstr() { Release(); }
 };
 
@@ -31,7 +31,7 @@ class ComRef
 public:
 	T* _ptr;
 
-	inline ComRef() : _ptr(nullptr) {}
+	inline ComRef() : _ptr(NULL) {}
 	inline ComRef(T* ptr) : _ptr(ptr) {}
 	inline ComRef(const ComRef& other) { _ptr = other._ptr; if (_ptr) { _ptr->AddRef(); } }
 	inline ComRef& operator=(const ComRef& other) { Release(); _ptr = other._ptr; if (_ptr) { _ptr->AddRef(); } return *this; }
@@ -40,7 +40,7 @@ public:
 	inline T* operator *() { return _ptr; }
 	inline T* operator ->() { return _ptr; }
 
-	inline void Release() { if (_ptr) { _ptr->Release(); _ptr = nullptr; } }
+	inline void Release() { if (_ptr) { _ptr->Release(); _ptr = NULL; } }
 	inline ~ComRef() { Release(); }
 };
 
@@ -52,7 +52,7 @@ public:
 
 	inline SymbolEnumerator() {}
 
-	inline bool Find(IDiaSymbol* parent, enum SymTagEnum tagType, const wchar_t* filter = nullptr, NameSearchOptions opt = nsNone) {
+	inline bool Find(IDiaSymbol* parent, enum SymTagEnum tagType, const wchar_t* filter = NULL, NameSearchOptions opt = nsNone) {
 		return (SUCCEEDED(parent->findChildren(tagType, filter, opt, &_enumerator)));
 	}
 
@@ -66,11 +66,11 @@ public:
 	inline ComRef<IDiaSymbol>& ref() { return _sym; }
 };
 
-static ComRef<IDiaSymbol> FindSymbol(IDiaSymbol* parent, enum SymTagEnum tagType, const wchar_t* filter = nullptr)
+static ComRef<IDiaSymbol> FindSymbol(IDiaSymbol* parent, enum SymTagEnum tagType, const wchar_t* filter = NULL)
 {
 	ComRef<IDiaEnumSymbols> enumerator;
 	if (SUCCEEDED(parent->findChildren(tagType, filter, nsNone, &enumerator))) {
-		IDiaSymbol* child = nullptr;
+		IDiaSymbol* child = NULL;
 		ULONG celt = 0;
 		if (SUCCEEDED(enumerator->Next(1, &child, &celt)) && (celt == 1)) {
 			return ComRef<IDiaSymbol>(child);

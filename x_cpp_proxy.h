@@ -36,7 +36,7 @@ static void CppProxyPrintForwardDecl(IDiaSymbol *global, ResolvedUdtGraphPtr res
 	}
 }
 
-static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
+static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE, BOOL bZeroInitialize = FALSE)
 {
 	// https://github.com/MicrosoftDocs/visualstudio-docs/blob/master/docs/debugger/debug-interface-access/lexical-hierarchy-of-symbol-types.md
 	// https://github.com/MicrosoftDocs/visualstudio-docs/blob/master/docs/debugger/debug-interface-access/class-hierarchy-of-symbol-types.md
@@ -104,6 +104,42 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 	wprintf(L" {\n");
 	wprintf(L"public:\n");
 
+	BOOL addFakeVtp = FALSE;
+
+	// virtual table ptr
+	{
+		BOOL hasIntroVf = FALSE;
+		BOOL hasOverVf = FALSE;
+
+		SymbolEnumerator symbol;
+		if (symbol.Find(pUDT, SymTagFunction, NULL)) {
+			while (symbol.Next()) {
+
+				Bstr funcName;
+				symbol->get_name(&funcName);
+
+				BOOL isVirtual = FALSE;
+				symbol->get_virtual(&isVirtual);
+
+				if (isVirtual) {
+					BOOL isIntro = FALSE;
+					symbol->get_intro(&isIntro);
+
+					if (isIntro)
+						hasIntroVf = TRUE;
+					else
+						hasOverVf = TRUE;
+				}
+			}
+		}
+
+		if (hasIntroVf && !hasOverVf)
+		{
+			addFakeVtp = TRUE;
+			wprintf(L"\tvoid* _vtable;\n");
+		}
+	}
+
 	// data
 	{
 		SymbolEnumerator symbol;
@@ -124,13 +160,51 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 					DWORD fieldTypeTag;
 					fieldType->get_symTag(&fieldTypeTag);
 
+					BOOL isRef = FALSE;
+					fieldType->get_reference(&isRef);
+
 					wprintf(L"\t");
-					PrintTypeX(*fieldType);
+					if (!isRef) {
+						PrintTypeX(*fieldType);
+					}
+					else {
+						PrintPointerTypeX(*fieldType, NULL, TRUE);
+					}
 					wprintf(L" %s", *fieldName);
 
 					if (fieldTypeTag == SymTagArrayType)
 					{
 						PrintArraySizeX(*fieldType);
+					}
+
+					// default zero initialization
+					if (bZeroInitialize && (fieldTypeTag == SymTagBaseType || fieldTypeTag == SymTagPointerType || fieldTypeTag == SymTagEnum || fieldTypeTag == SymTagArrayType))
+					{
+						if (!isRef)
+						{
+							if (fieldTypeTag == SymTagEnum)
+							{
+								// SomeEnum e = {} crashes the compiler LOL
+								wprintf(L" = (");
+								PrintTypeX(*fieldType);
+								wprintf(L")(0)");
+							}
+							else if (fieldTypeTag == SymTagArrayType)
+							{
+								ComRef<IDiaSymbol> arrType;
+								fieldType->get_type(&arrType);
+
+								DWORD arrTypeTag;
+								arrType->get_symTag(&arrTypeTag);
+
+								if (arrTypeTag == SymTagBaseType || arrTypeTag == SymTagPointerType)
+								{
+									wprintf(L" = {}");
+								}
+							}
+							else
+								wprintf(L" = 0");
+						}
 					}
 
 					wprintf(L";\n");
@@ -139,57 +213,12 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 		}
 	}
 
-	// dummy constructor
-	#if defined(GEN_DUMMY_CTOR)
+	// methods
 	{
-		wprintf(L"\tinline %s()", nameFixed.c_str());
-		int count = 0;
-		SymbolEnumerator symbol;
-		if (symbol.Find(pUDT, SymTagData, NULL)) {
-			while (symbol.Next()) {
+		BOOL hasDefConstructor = FALSE;
+		BOOL hasCtor = FALSE;
+		BOOL hasDtor = FALSE;
 
-				DWORD dwDataKind;
-				symbol->get_dataKind(&dwDataKind);
-
-				if (dwDataKind == DataIsMember)
-				{
-					ComRef<IDiaSymbol> fieldType;
-					symbol->get_type(&fieldType);
-
-					BOOL isRef = FALSE;
-					fieldType->get_reference(&isRef);
-
-					if (isRef) {
-
-						if (!count) wprintf(L" : ");
-						else wprintf(L", ");
-
-						Bstr fieldName;
-						symbol->get_name(&fieldName);
-						wprintf(L"%s(*((", *fieldName);
-
-						ComRef<IDiaSymbol> baseType;
-						fieldType->get_type(&baseType);
-						Bstr baseName;
-						baseType->get_name(&baseName);
-
-						PrintTypeX(*baseType);
-						wprintf(L"*)NULL))");
-
-						++count;
-					}
-				}
-			}
-		}
-		wprintf(L" { }\n");
-		const wchar_t* type = nameFixed.c_str();
-		wprintf(L"\tinline %s(const %s& other) = default;\n", type, type);
-		wprintf(L"\tinline %s& operator=(const %s& other) = default;\n", type, type);
-	}
-	#endif
-
-	// stubs
-	{
 		SymbolEnumerator symbol;
 		if (symbol.Find(pUDT, SymTagFunction, NULL)) {
 			while (symbol.Next()) {
@@ -200,7 +229,10 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				Bstr funcName;
 				symbol->get_name(&funcName);
 				if (wcsstr(*funcName, L"__vecDelDtor")) continue;
-				if (wcsstr(*funcName, L"operator=")) continue;
+
+				BOOL isDtor = (wcsstr(*funcName, L"~") ? TRUE : FALSE);
+				BOOL isCtor = (wcscmp(*funcName, nameInner.c_str()) == 0);
+				BOOL isFunc = !(isCtor || isDtor);
 
 				BOOL isPure = FALSE;
 				symbol->get_pure(&isPure);
@@ -220,17 +252,6 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				symbol->get_addressOffset(&dwOff);
 				BOOL isOptimized = (dwLocType == 0);
 
-				//if (isPure && !isVirtual) continue;
-				if (isOptimized && !isVirtual) continue;
-				//if (isOptimized) continue;
-
-				#if 0
-				if (wcsstr(*funcName, L"addMeshCollider"))
-				{
-					int asd=0;
-				}
-				#endif
-
 				BOOL isValidVirtual = FALSE;
 				DWORD vtpo = 0; // virtual table pointer offset
 				DWORD vfid = 0; // virtual function id in VT
@@ -243,7 +264,7 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				}
 
 				DWORD callConv = 0;
-				symbol->get_callingConvention(&callConv);
+				symbol->get_callingConvention(&callConv); // rgCallConv[callConv]
 
 				ComRef<IDiaSymbol> funcType;
 				symbol->get_type(&funcType);
@@ -251,98 +272,75 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 				ComRef<IDiaSymbol> returnType;
 				funcType->get_type(&returnType);
 
-				BOOL isDtor = (wcsstr(*funcName, L"~") ? TRUE : FALSE);
-				BOOL isCtor = (wcscmp(*funcName, nameInner.c_str()) == 0);
-				BOOL isFunc = !(isCtor || isDtor);
+				// UDT ctor/dtor
+				
+				if (isCtor && !isOptimized) {
+					hasCtor = TRUE;
+					wprintf(L"\tinline %s * ctor(", nameFixed.c_str());
+					PrintFunctionArgsX(*symbol, TRUE, TRUE);
+					wprintf(L") {");
 
-				// virtual funcs to fill vtable
-				if (isVirtual) {
-					if (isDtor) {
-						wprintf(L"\tvirtual ~%s()", nameFixed.c_str());
-					}
-					else {
-						wprintf(L"\tvirtual ");
-						PrintTypeX(*returnType);
-						wprintf(L" ");
-						if (callConv > 0) {
-							wprintf(L"%s ", rgCallConv[callConv]);
-						}
-						wprintf(L"%s_vf%u(", *funcName, (unsigned int)vfid);
-						PrintFunctionArgsX(*symbol, TRUE, TRUE);
-						wprintf(L")");
-					}
-					if (isPure) {
-						wprintf(L" = 0;");
-					}
-					else {
-						#if defined(GEN_VFUNC_BODY)
-						wprintf(L" { ");
-						if (!isOptimized) {
-							if (isDtor) {
-								wprintf(L"dtor();");
-							}
-							else {
-								//wprintf(L"return %s_impl(", *funcName);
-								//PrintFunctionArgsX(*symbol, FALSE, TRUE);
-								//wprintf(L");");
-								wprintf(L"typedef ");
-								PrintTypeX(*returnType);
-								wprintf(L" (");
-								if (callConv > 0) {
-									wprintf(L"%s ", rgCallConv[callConv]);
-								}
-								wprintf(L"*_fpt)(");
-								PrintFunctionArgsX(*symbol, TRUE, FALSE, nameFixed.c_str());
-								wprintf(L");");
-								wprintf(L" _fpt _f=(_fpt)_drva(%u);", (unsigned int)dwRVA);
-								wprintf(L" return _f(");
-								PrintFunctionArgsX(*symbol, FALSE, TRUE, nameFixed.c_str());
-								wprintf(L");");
-							}
-						}
-						wprintf(L" }");
-						#else
-						wprintf(L";");
-						#endif
-					}
-					wprintf(L"\n");
+					wprintf(L" typedef ");
+					wprintf(L"%s *", nameFixed.c_str());
+					wprintf(L" (%s::*_fpt)(", nameFixed.c_str());
+					PrintFunctionArgsX(*symbol, TRUE, FALSE);
+					wprintf(L");");
+					
+					wprintf(L" auto _f=xcast<_fpt>(_drva(%u));", (unsigned int)dwRVA);
+					wprintf(L" return (this->*_f)(");
+					PrintFunctionArgsX(*symbol, FALSE, TRUE);
+					wprintf(L");");
+
+					wprintf(L" }\n");
 				}
 
-				// inline rva calls
-				//if (!isOptimized && !isPure) {
-				if (!isOptimized) {
+				if (isDtor && (!isOptimized || (isVirtual && isValidVirtual))) {
+					hasDtor = TRUE;
+					wprintf(L"\tinline void dtor() {");
+
+					wprintf(L" typedef ");
+					PrintTypeX(*returnType);
+					wprintf(L" (%s::*_fpt)(", nameFixed.c_str());
+					PrintFunctionArgsX(*symbol, TRUE, FALSE);
+					wprintf(L");");
+
+					if (isVirtual) {
+						wprintf(L" auto _f=xcast<_fpt>(get_vfp(this, %u));", (unsigned int)vfid);
+					}
+					else {
+						wprintf(L" auto _f=xcast<_fpt>(_drva(%u));", (unsigned int)dwRVA);
+					}
+					wprintf(L" (this->*_f)();");
+
+					wprintf(L" }\n");
+				}
+
+				// direct rva calls
+
+				if (isFunc && !isOptimized) {
 
 					wprintf(L"\tinline ");
-
 					if (isStatic) {
 						wprintf(L"static ");
 					}
-
-					if (isDtor) {
-						wprintf(L"void dtor");
+					PrintTypeX(*returnType);
+					wprintf(L" ");
+					if (callConv > 0) {
+						wprintf(L"%s ", rgCallConv[callConv]);
 					}
-					else if (isCtor) {
-						wprintf(L"void ctor");
+					if (isVirtual) {
+						wprintf(L"%s_impl", *funcName);
 					}
 					else {
-						PrintTypeX(*returnType);
-						wprintf(L" ");
-
-						if (callConv > 0) {
-							wprintf(L"%s ", rgCallConv[callConv]); // not __cdecl
-						}
-
-						if (isVirtual) {
-							wprintf(L"%s_impl", *funcName);
-						}
-						else {
-							wprintf(L"%s", *funcName);
-						}
+						wprintf(L"%s", *funcName);
 					}
 					wprintf(L"(");
 					PrintFunctionArgsX(*symbol, TRUE, TRUE);
 					wprintf(L")");
+
+					// body
 					wprintf(L" { ");
+
 					wprintf(L"typedef ");
 					PrintTypeX(*returnType);
 					wprintf(L" (");
@@ -357,82 +355,67 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE)
 						PrintFunctionArgsX(*symbol, TRUE, FALSE);
 					}
 					else {
-						//PrintFunctionArgsX(*symbol, TRUE, FALSE, nameFixed.c_str());
 						PrintFunctionArgsX(*symbol, TRUE, FALSE);
 					}
 					wprintf(L");");
+
 					if (isStatic) {
 						wprintf(L" auto _f=(_fpt)_drva(%u);", (unsigned int)dwRVA);
 					}
 					else {
 						wprintf(L" auto _f=xcast<_fpt>(_drva(%u));", (unsigned int)dwRVA);
 					}
-					if (isDtor) {
-						//wprintf(L" _f(this);");
-						wprintf(L" (this->*_f)();");
+
+					if (isStatic) {
+						wprintf(L" return _f(");
 					}
 					else {
-						if (isCtor) {
-							//wprintf(L" _f(");
-							wprintf(L" (this->*_f)(");
-						}
-						else {
-							if (isStatic) {
-								wprintf(L" return _f(");
-							}
-							else {
-								wprintf(L" return (this->*_f)(");
-							}
-						}
-						if (isStatic) {
-							PrintFunctionArgsX(*symbol, FALSE, TRUE);
-						}
-						else {
-							//PrintFunctionArgsX(*symbol, FALSE, TRUE, nameFixed.c_str());
-							PrintFunctionArgsX(*symbol, FALSE, TRUE);
-						}
-						wprintf(L");");
+						wprintf(L" return (this->*_f)(");
 					}
+					if (isStatic) {
+						PrintFunctionArgsX(*symbol, FALSE, TRUE);
+					}
+					else {
+						PrintFunctionArgsX(*symbol, FALSE, TRUE);
+					}
+					wprintf(L");");
+
 					wprintf(L" }");
 					wprintf(L"\n");
 				}
 
 				// virtual redirectors
+
 				#if defined(GEN_VFUNC_REDIR)
 				if (isVirtual && isFunc) {
 					wprintf(L"\tinline ");
 					PrintTypeX(*returnType);
-					wprintf(L" ");
-					if (callConv > 0) {
-						wprintf(L"%s ", rgCallConv[callConv]);
-					}
-					wprintf(L"%s(", *funcName);
+					wprintf(L" %s(", *funcName);
 					PrintFunctionArgsX(*symbol, TRUE, TRUE);
-					wprintf(L")");
-					wprintf(L" { ");
+					wprintf(L") {");
 
-					#if 0
-						wprintf(L"return %s_vf%u(", *funcName, (unsigned int)vfid);
-						PrintFunctionArgsX(*symbol, FALSE, TRUE);
-						wprintf(L");");
-					#else
-						wprintf(L"typedef ");
-						PrintTypeX(*returnType);
-						wprintf(L" (");
-						wprintf(L"%s::", nameFixed.c_str());
-						wprintf(L"*_fpt)(");
-						PrintFunctionArgsX(*symbol, TRUE, FALSE);
-						wprintf(L");");
-						wprintf(L" auto _f=xcast<_fpt>(get_vfp(this, %u));", (unsigned int)vfid);
-						wprintf(L" return (this->*_f)(");
-						PrintFunctionArgsX(*symbol, FALSE, TRUE);
-						wprintf(L");");
-					#endif
+					wprintf(L" typedef ");
+					PrintTypeX(*returnType);
+					wprintf(L" (%s::*_fpt)(", nameFixed.c_str());
+					PrintFunctionArgsX(*symbol, TRUE, FALSE);
+					wprintf(L");");
+					wprintf(L" auto _f=xcast<_fpt>(get_vfp(this, %u));", (unsigned int)vfid);
+					wprintf(L" return (this->*_f)(");
+					PrintFunctionArgsX(*symbol, FALSE, TRUE);
+					wprintf(L");");
 
 					wprintf(L" }\n");
 				}
 				#endif
 			}
+		}
+
+		if (!hasCtor) {
+			wprintf(L"\tinline %s * ctor() { return this; }\n", nameFixed.c_str());
+		}
+
+		if (!hasDtor) {
+			wprintf(L"\tinline void dtor() {}\n");
 		}
 	}
 

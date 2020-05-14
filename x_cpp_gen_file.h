@@ -19,7 +19,7 @@ static void CppGenEnums(IDiaSymbol *global, ResolvedUdtGraphPtr graph)
 					if (uniqEnums.find(nameFixed) == uniqEnums.end()) {
 						uniqEnums.insert(nameFixed);
 
-						FILE* fd = nullptr;
+						FILE* fd = NULL;
 						_wfopen_s(&fd, fileName.c_str(), L"wt");
 						if (fd)
 						{
@@ -74,7 +74,7 @@ static void CppGenClass(IDiaSymbol *pGlobal, IDiaSymbol *pUDT, UdtNodePtr& node,
 	}
 
 	std::wstring fileName(nameFixed + L".h");
-	FILE* fd = nullptr;
+	FILE* fd = NULL;
 	_wfopen_s(&fd, fileName.c_str(), L"wt");
 	if (!fd) return;
 
@@ -366,7 +366,7 @@ static void CppGenClass(IDiaSymbol *pGlobal, IDiaSymbol *pUDT, UdtNodePtr& node,
 					}
 					fwprintf(fd, L"(");
 					std::wstring funcArgsStr;
-					PrintFunctionArgsX(*symbol, TRUE, TRUE, nullptr, &funcArgsStr);
+					PrintFunctionArgsX(*symbol, TRUE, TRUE, NULL, &funcArgsStr);
 					fwprintf(fd, L"%s", funcArgsStr.c_str());
 					fwprintf(fd, L")");
 
@@ -392,7 +392,7 @@ static void CppGenClass(IDiaSymbol *pGlobal, IDiaSymbol *pUDT, UdtNodePtr& node,
 						fwprintf(fd, L"%s(", *funcName);
 
 						std::wstring funcArgsStr;
-						PrintFunctionArgsX(*symbol, TRUE, TRUE, nullptr, &funcArgsStr);
+						PrintFunctionArgsX(*symbol, TRUE, TRUE, NULL, &funcArgsStr);
 						fwprintf(fd, L"%s", funcArgsStr.c_str());
 
 						fwprintf(fd, L")");

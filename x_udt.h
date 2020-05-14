@@ -318,7 +318,7 @@ static void GetUdtDeps(IDiaSymbol *pGlobal, IDiaSymbol *pUDT, std::unordered_map
 // GET GRAPH
 //
 
-static UdtGraphPtr GetUdtGraph(IDiaSymbol* global, const wchar_t* filter = nullptr)
+static UdtGraphPtr GetUdtGraph(IDiaSymbol* global, const wchar_t* filter = NULL)
 {
 	UdtGraphPtr result(std::make_shared<UdtGraph>());
 

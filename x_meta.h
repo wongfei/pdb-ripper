@@ -11,7 +11,7 @@ static std::wstring GetUniqFunctionName(IDiaSymbol *pFunc, BOOL bWithArgs = TRUE
 	if (bWithArgs)
 	{
 		result.append(L"(");
-		PrintFunctionArgsX(pFunc, TRUE, FALSE, nullptr, &result);
+		PrintFunctionArgsX(pFunc, TRUE, FALSE, NULL, &result);
 		result.append(L")");
 	}
 

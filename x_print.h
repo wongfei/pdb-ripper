@@ -1,7 +1,7 @@
 #pragma once
 
 // forward decl
-static void PrintTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr);
+static void PrintTypeX(IDiaSymbol *pSymbol, std::wstring* dst = NULL);
 
 static void wprintfX(std::wstring* dst, const wchar_t* format, ...)
 {
@@ -18,7 +18,7 @@ static void wprintfX(std::wstring* dst, const wchar_t* format, ...)
 	}
 }
 
-static void PrintVariantX(VARIANT var, std::wstring* dst = nullptr)
+static void PrintVariantX(VARIANT var, std::wstring* dst = NULL)
 {
 	switch (var.vt) {
 		case VT_UI1:
@@ -57,7 +57,7 @@ static void PrintVariantX(VARIANT var, std::wstring* dst = nullptr)
 	}
 }
 
-static void PrintNameX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintNameX(IDiaSymbol *pSymbol, std::wstring* dst = NULL)
 {
 	BSTR bstrName;
 	BSTR bstrUndName;
@@ -83,7 +83,7 @@ static void PrintNameX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	SysFreeString(bstrName);
 }
 
-static void PrintBaseTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintBaseTypeX(IDiaSymbol *pSymbol, std::wstring* dst = NULL)
 {
 	DWORD dwInfo;
 	if (pSymbol->get_baseType(&dwInfo) != S_OK) return;
@@ -138,7 +138,7 @@ static void PrintBaseTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	}
 }
 
-static void PrintLocationX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintLocationX(IDiaSymbol *pSymbol, std::wstring* dst = NULL)
 {
 	DWORD dwLocType;
 	DWORD dwRVA, dwSect, dwOff, dwReg, dwBitPos, dwSlot;
@@ -221,7 +221,7 @@ static void PrintLocationX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	}
 }
 
-static void PrintPointerTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintPointerTypeX(IDiaSymbol *pSymbol, std::wstring* dst = NULL, BOOL replaceRefWithPtr = FALSE)
 {
 	ComRef<IDiaSymbol> pBaseType;
 	if (pSymbol->get_type(&pBaseType) != S_OK) return;
@@ -264,7 +264,10 @@ static void PrintPointerTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	}
 
 	if (isRef) {
-		wprintfX(dst, L" &");
+		if (replaceRefWithPtr)
+			wprintfX(dst, L" *");
+		else
+			wprintfX(dst, L" &");
 	}
 	else {
 		wprintfX(dst, L" *");
@@ -286,7 +289,7 @@ static void PrintPointerTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	#endif
 }
 
-static void PrintBoundX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintBoundX(IDiaSymbol *pSymbol, std::wstring* dst = NULL)
 {
 	DWORD dwTag = 0;
 	DWORD dwKind;
@@ -313,7 +316,7 @@ static void PrintBoundX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	}
 }
 
-static void PrintArraySizeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintArraySizeX(IDiaSymbol *pSymbol, std::wstring* dst = NULL)
 {
 	DWORD symTag;
 	pSymbol->get_symTag(&symTag);
@@ -377,7 +380,7 @@ static void PrintArraySizeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	}
 }
 
-static void PrintCustomTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
+static void PrintCustomTypeX(IDiaSymbol *pSymbol, std::wstring* dst = NULL)
 {
 	DWORD idOEM, idOEMSym;
 	DWORD cbData = 0;
@@ -418,11 +421,7 @@ static void PrintCustomTypeX(IDiaSymbol *pSymbol, std::wstring* dst = nullptr)
 	}
 }
 
-enum class EPrintFuncArgs {
-
-};
-
-static void PrintFunctionArgsX(IDiaSymbol *pFunc, BOOL genArgTypes = TRUE, BOOL genArgNames = FALSE, const wchar_t* pthisType = nullptr, std::wstring* dst = nullptr)
+static void PrintFunctionArgsX(IDiaSymbol *pFunc, BOOL genArgTypes = TRUE, BOOL genArgNames = FALSE, const wchar_t* pthisType = NULL, std::wstring* dst = NULL)
 {
 	if (!genArgTypes && !genArgNames) return;
 
@@ -492,7 +491,7 @@ static void PrintFunctionArgsX(IDiaSymbol *pFunc, BOOL genArgTypes = TRUE, BOOL 
 					}
 					if (genArgNames) {
 						if (genArgTypes) {
-							wprintfX(dst, L" ");
+							//wprintfX(dst, L" ");
 						}
 						wprintfX(dst, L" _arg%d", argId);
 					}
@@ -583,6 +582,48 @@ static void PrintTypeX(IDiaSymbol *pSymbol, std::wstring* dst)
 		{
 			PrintLocationX(pSymbol, dst);
 			break;
+		}
+	}
+}
+
+static void PrintFakeRefsX(IDiaSymbol *pUDT, std::wstring* dst = NULL)
+{
+	int count = 0;
+	SymbolEnumerator symbol;
+	if (symbol.Find(pUDT, SymTagData, NULL)) {
+		while (symbol.Next()) {
+
+			DWORD dwDataKind;
+			symbol->get_dataKind(&dwDataKind);
+
+			if (dwDataKind == DataIsMember)
+			{
+				ComRef<IDiaSymbol> fieldType;
+				symbol->get_type(&fieldType);
+
+				BOOL isRef = FALSE;
+				fieldType->get_reference(&isRef);
+
+				if (isRef) {
+
+					if (!count) wprintfX(dst, L" : ");
+					else wprintfX(dst, L", ");
+
+					Bstr fieldName;
+					symbol->get_name(&fieldName);
+					wprintfX(dst, L"%s(*((", *fieldName);
+
+					ComRef<IDiaSymbol> baseType;
+					fieldType->get_type(&baseType);
+					Bstr baseName;
+					baseType->get_name(&baseName);
+
+					PrintTypeX(*baseType);
+					wprintfX(dst, L"*)NULL))");
+
+					++count;
+				}
+			}
 		}
 	}
 }

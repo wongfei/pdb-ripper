@@ -28,7 +28,7 @@
 #include "x_udt.h"
 
 // [CONFIG]
-#define GEN_DUMMY_CTOR
+//#define GEN_DUMMY_CTOR
 #define GEN_VFUNC_REDIR
 //#define GEN_VFUNC_BODY
 
@@ -48,6 +48,7 @@ void RipPdb(IDiaSymbol *pGlobal, int argc, wchar_t *argv[])
 	BOOL bSymbols = FALSE;
 	BOOL bMeta = FALSE;
 	BOOL bGuardObjects = FALSE;
+	BOOL bZeroInitialize = FALSE;
 	BOOL bExpandDeps = FALSE;
 	BOOL bResolveDeps = FALSE;
 	std::wstring filter;
@@ -62,6 +63,7 @@ void RipPdb(IDiaSymbol *pGlobal, int argc, wchar_t *argv[])
 			else if (!wcscmp(argv[i], L"-s")) bSymbols = TRUE;
 			else if (!wcscmp(argv[i], L"-m")) bMeta = TRUE;
 			else if (!wcscmp(argv[i], L"-g")) bGuardObjects = TRUE;
+			else if (!wcscmp(argv[i], L"-zi")) bZeroInitialize = TRUE;
 			else if (!wcscmp(argv[i], L"-d")) bExpandDeps = TRUE;
 			else if (!wcscmp(argv[i], L"-rd")) bResolveDeps = TRUE;
 			else if (!wcscmp(argv[i], L"-names") && (i + 1 < argc - 1)) { filter = argv[i + 1]; i++; }
@@ -112,7 +114,7 @@ void RipPdb(IDiaSymbol *pGlobal, int argc, wchar_t *argv[])
 					PrintMetaUDT(*node->symbol);
 				}
 				if (bPrintCppProxy) {
-					CppProxyPrintUDT(*node->symbol, bGuardObjects);
+					CppProxyPrintUDT(*node->symbol, bGuardObjects, bZeroInitialize);
 				}
 				if (bGenerateCppFiles) {
 					CppGenClass(pGlobal, *node->symbol, node, resolved, graph);
