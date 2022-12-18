@@ -79,7 +79,8 @@ static inline bool endsWith(const std::wstring& s, wchar_t ch) {
 }
 
 static inline void removePrefix(std::wstring& str, const std::wstring& prefix) {
-	auto pos = str.find_first_of(prefix);
+	//auto pos = str.find_first_of(prefix);
+	auto pos = str.find(prefix);
 	if ((pos != std::wstring::npos) && (pos + prefix.length() < str.length())) {
 		std::wstring tmp(str.substr(pos + prefix.length()));
 		str = tmp;
