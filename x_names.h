@@ -68,8 +68,10 @@ inline std::wstring fixName(const std::wstring& name)
 	std::wstring fixed(name);
 	replaceAll(fixed, L"std::", L"stdXX");
 	replaceAll(fixed, L"Concurrency::", L"ConcurrencyXX");
+	replaceAll(fixed, L"DirectX::", L"DirectXXX");
 	replaceAll(fixed, L"::", L"_");
 	replaceAll(fixed, L"stdXX", L"std::");
 	replaceAll(fixed, L"ConcurrencyXX", L"Concurrency::");
+	replaceAll(fixed, L"DirectXXX", L"DirectX::");
 	return fixed;
 }

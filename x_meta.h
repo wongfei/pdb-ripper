@@ -286,6 +286,9 @@ static void PrintMetaFunction(Bstr& udtName, IDiaSymbol* pUDT, IDiaSymbol *pSymb
 {
 	// https://github.com/MicrosoftDocs/visualstudio-docs/blob/master/docs/debugger/debug-interface-access/function-debug-interface-access-sdk.md
 
+	DWORD symId;
+	pSymbol->get_symIndexId(&symId);
+
 	Bstr name;
 	pSymbol->get_name(&name);
 
@@ -349,7 +352,7 @@ static void PrintMetaFunction(Bstr& udtName, IDiaSymbol* pUDT, IDiaSymbol *pSymb
 
 	wprintf(L" @loc=%s", (dwLocType > 0 ? rgLocationTypeString[dwLocType] : L"optimized"));
 
-	wprintf(L" @len=%u @rva=%u", (unsigned int)len, (unsigned int)dwRVA);
+	wprintf(L" @len=%u @rva=%u @symid=%u", (unsigned int)len, (unsigned int)dwRVA, (unsigned int)symId);
 
 	//std::wstring uniq = GetUniqFunctionName(pSymbol);
 	//wprintf(L" @uniq \"%s\"", uniq.c_str());

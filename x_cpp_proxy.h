@@ -219,6 +219,19 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE, BOOL b
 		BOOL hasCtor = FALSE;
 		BOOL hasDtor = FALSE;
 
+		std::wstring ctorPrefix;
+		ctorPrefix.assign(L"__cdecl ");
+		ctorPrefix.assign(nameInner);
+		ctorPrefix.append(L"::");
+		ctorPrefix.append(nameInner);
+		ctorPrefix.append(L"(");
+
+		std::wstring fixedFuncName;
+		fixedFuncName.reserve(1024);
+
+		std::wstring funcNamespace(*name);
+		funcNamespace.append(L"::");
+
 		SymbolEnumerator symbol;
 		if (symbol.Find(pUDT, SymTagFunction, NULL)) {
 			while (symbol.Next()) {
@@ -230,8 +243,21 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE, BOOL b
 				symbol->get_name(&funcName);
 				if (wcsstr(*funcName, L"__vecDelDtor")) continue;
 
+				fixedFuncName.assign(*funcName);
+				replace(fixedFuncName, funcNamespace, L"");
+
+				Bstr undecName;
+				symbol->get_undecoratedName(&undecName);
+
 				BOOL isDtor = (wcsstr(*funcName, L"~") ? TRUE : FALSE);
 				BOOL isCtor = (wcscmp(*funcName, nameInner.c_str()) == 0);
+
+				// HACK for newer msdia
+				if (wcsstr(*undecName, ctorPrefix.c_str()))
+				{
+					isCtor = TRUE;
+				}
+
 				BOOL isFunc = !(isCtor || isDtor);
 
 				BOOL isPure = FALSE;
@@ -251,6 +277,12 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE, BOOL b
 				symbol->get_addressSection(&dwSect);
 				symbol->get_addressOffset(&dwOff);
 				BOOL isOptimized = (dwLocType == 0);
+
+				// HACK for newer msdia
+				if (isFunc && dwLocType == LocIsStatic && dwRVA && isPure && !isVirtual)
+				{
+					isStatic = TRUE;
+				}
 
 				BOOL isValidVirtual = FALSE;
 				DWORD vtpo = 0; // virtual table pointer offset
@@ -329,10 +361,10 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE, BOOL b
 						wprintf(L"%s ", rgCallConv[callConv]);
 					}
 					if (isVirtual) {
-						wprintf(L"%s_impl", *funcName);
+						wprintf(L"%s_impl", fixedFuncName.c_str()); // funcName
 					}
 					else {
-						wprintf(L"%s", *funcName);
+						wprintf(L"%s", fixedFuncName.c_str()); // funcName
 					}
 					wprintf(L"(");
 					PrintFunctionArgsX(*symbol, TRUE, TRUE);
@@ -390,7 +422,7 @@ static void CppProxyPrintUDT(IDiaSymbol *pUDT, BOOL bGuardObject = FALSE, BOOL b
 				if (isVirtual && isFunc) {
 					wprintf(L"\tinline ");
 					PrintTypeX(*returnType);
-					wprintf(L" %s(", *funcName);
+					wprintf(L" %s(", fixedFuncName.c_str()); // *funcName
 					PrintFunctionArgsX(*symbol, TRUE, TRUE);
 					wprintf(L") {");
 
